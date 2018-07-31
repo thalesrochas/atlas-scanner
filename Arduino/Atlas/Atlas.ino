@@ -10,6 +10,7 @@
  * *    I2C SCL (Verde): SCL -> A5 (Arduino Pro Mini)
  * *    I2C SDA (Azul): SDA -> A4 (Arduino Pro Mini)
  * *    GND (Preto): GND
+ * *    Capacitor na entrada do Arduino
 */
 LIDARLite lidar;
 
