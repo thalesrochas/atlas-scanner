@@ -179,7 +179,7 @@ void loop() {
     // TODO: Calcular valor de phi através da posição do motor de passo.
     float phi = 180;
 
-    file.print(distancia);
+    file.print(r);
     file.print("\t");
     file.print(theta);
     file.print("\t");
@@ -189,7 +189,7 @@ void loop() {
         r = lidar.distance(false);
         theta = ticks * (360 / (TICKS_PER_TURN - 1)); // Regra de 3
         
-        file.print(distancia);
+        file.print(r);
         file.print("\t");
         file.print(theta);
         file.print("\t");
