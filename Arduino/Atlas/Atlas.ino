@@ -174,28 +174,38 @@ void loop() {
      *      true: Medição com a correção de polarização. Deve ser realizada
      *            periodicamente (1 em cada 100 medições). -> Default
      */
-    float r = lidar.distance();
-    float theta = ticks * (360 / (TICKS_PER_TURN - 1)); // Regra de 3
-    // TODO: Calcular valor de phi através da posição do motor de passo.
-    float phi = 180;
+    int r;
+    float theta;
+    float phi;
 
-    file.print(r);
-    file.print("\t");
-    file.print(theta);
-    file.print("\t");
-    file.println(phi);
+    for (int j = 0; j < 100; j++) {
+        Serial.print("Rodada ");
+        Serial.println(j+1);
 
-    for(byte i = 0; i < 100; i++) {
-        r = lidar.distance(false);
-        theta = ticks * (360 / (TICKS_PER_TURN - 1)); // Regra de 3
-        
+        r = lidar.distance();
+        theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1)); // Regra de 3
+        // TODO: Calcular valor de phi através da posição do motor de passo.
+        phi = 180;
+
         file.print(r);
         file.print("\t");
         file.print(theta);
         file.print("\t");
         file.println(phi);
-    }
 
+        for(byte i = 0; i < 99; i++) {
+            r = lidar.distance(false);
+            theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1));
+            
+            file.print(r);
+            file.print("\t");
+            file.print(theta);
+            file.print("\t");
+            file.println(phi);
+        }
+        file.flush(); // Descarrega os dados do buffer no arquivo.
+    }
+    file.print("\b");
     file.close(); // Fecha o acesso ao arquivo
     Serial.println("Fim da captura de pontos.\n");
 
