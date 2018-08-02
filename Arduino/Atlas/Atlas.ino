@@ -1,6 +1,25 @@
 #include <Wire.h>
 #include <LIDARLite.h>
 #include <Stepper.h>
+#include <SPI.h>
+#include <SD.h>
+
+//* Define a porta em que o endstop do motor de passo está ligada.
+byte ENDSTOP = 4;
+
+//* Define o pino CS do leitor de cartão.
+byte CS_PIN = 10;
+
+// Define a quantidade máxima de passos que o motor pode girar.
+int STEP_LIMIT = 355;
+
+/**
+ * * Conexões do Leitor de Cartão:
+ * *    CS: 10 -> Pode ser alterado na variável CS_PIN
+ * *    SCK: 13
+ * *    MOSI: 11
+ * *    MISO: 12
+ */
 
 /**
  * Cria o objeto do sensor LIDAR.
@@ -11,7 +30,7 @@
  * *    I2C SDA (Azul): SDA -> A4 (Arduino Pro Mini)
  * *    GND (Preto): GND
  * *    Capacitor na entrada do Arduino
-*/
+ */
 LIDARLite lidar;
 
 /**
@@ -25,14 +44,18 @@ LIDARLite lidar;
  */
 Stepper stepper = Stepper(400, 6, 7, 8, 9);
 
-//* Define a porta em que o endstop do motor de passo está ligada.
-const int ENDSTOP = 4;
-
-// Define a quantidade máxima de passos que o motor pode girar.
-const int STEP_LIMIT = 355;
-
 void setup() {
     Serial.begin(38400);
+    Serial.println("Porta Serial inicializada.\n");
+
+    Serial.println("Inicializando cartão SD...");
+    if (!SD.begin(CS_PIN)) {
+        Serial.println("Falha no cartão.\n");
+        while(true);
+    }
+    else {
+        Serial.println("Cartão SD Inicializado.\n");
+    }
 
     /**
      * O método begin inicializa e define a configuração do sensor.
@@ -55,8 +78,9 @@ void setup() {
      * @param fasti2c Altera a velocidade padrão de comunicação I2C:
      *      false: 100khz -> Default.
      *      true: 400khz.
-    */
+     */
     lidar.begin(0, true);
+    Serial.println("Sensor LIDAR inicializado.\n");
 
     pinMode(ENDSTOP, INPUT); // Define o endstop como entrada
     stepper.setSpeed(80); // Configura o motor para velocidade de 80rpm.
@@ -71,9 +95,29 @@ void setup() {
     //// stepper.step(STEP_LIMIT); // Leva o sensor até a posição inicial de leitura.
 }
 
-int distancia = 0;
-
 void loop() {
+    // Recebe pela porta serial o nome do arquivo de pontos.
+    String filename = "";
+    Serial.print("Filename: ");
+    while (filename == "") {
+        if (Serial.available()) {
+            filename = Serial.readString();
+            filename += ".txt";
+        }
+    }
+
+    // Inicializa um novo arquivo para armazenar os pontos
+    Serial.println("Inicializando arquivo " + filename + "...");
+    File file = SD.open(filename, FILE_WRITE);
+    if (!file) {
+        Serial.println("Erro ao criar o arquivo " + filename + "\n");
+        while(true);
+    }
+    
+    Serial.println("Iniciando captura de pontos...");
+
+    // Captura as distâncias e insere os dados no arquivo
+    int distancia = 0;
     /**
      * O método distance dispara o sensor e realiza uma medição.
      * 
@@ -81,12 +125,17 @@ void loop() {
      *      false: Medição mais rápida, sem correção.
      *      true: Medição com a correção de polarização. Deve ser realizada
      *            periodicamente (1 em cada 100 medições). -> Default
-    */
+     */
     distancia = lidar.distance();
-    Serial.println(distancia);
+    //// Serial.println(distancia);
+    file.println(distancia);
 
-    for(int i = 0; i < 99; i++) {
+    for(byte i = 0; i < 99; i++) {
         distancia = lidar.distance(false);
-        Serial.println(distancia);
+        //// Serial.println(distancia);
+        file.println(distancia);
     }
+
+    file.close(); // Fecha o acesso ao arquivo
+    Serial.println("Fim da captura de pontos.");
 }
