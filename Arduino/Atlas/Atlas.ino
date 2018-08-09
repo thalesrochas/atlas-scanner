@@ -205,7 +205,7 @@ void loop() {
         }
         file.flush(); // Descarrega os dados do buffer no arquivo.
     }
-    file.print("\b");
+    
     file.close(); // Fecha o acesso ao arquivo
     Serial.println("Fim da captura de pontos.\n");
 
