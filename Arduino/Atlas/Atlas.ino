@@ -49,7 +49,7 @@ int ticks = 0;
  * *    I2C SCL (Verde): SCL -> A5 (Arduino Pro Mini)
  * *    I2C SDA (Azul): SDA -> A4 (Arduino Pro Mini)
  * *    GND (Preto): GND
- * *    Capacitor na entrada do Arduino
+ * *    Capacitor de 1000 uF na entrada do Arduino (para evitar correntes de pico)
  */
 LIDARLite lidar;
 
@@ -121,6 +121,10 @@ void setup() {
 
     pinMode(ENDSTOP_PIN, INPUT); // Define o endstop como entrada
     stepper.setSpeed(80); // Configura o motor para velocidade de 80rpm.
+}
+
+void loop() {
+    Serial.println("Nova medição");
 
     // Leva o suporte ao início até o endstop ser ativado.
     //? Há uma negação (!) na expressão devido a lógica invertida do botão.
@@ -130,10 +134,7 @@ void setup() {
     }
     //// delay(500);
     //// stepper.step(STEP_LIMIT); // Leva o sensor até a posição inicial de leitura.
-}
 
-void loop() {
-    Serial.println("Nova medição");
     // Recebe pela porta serial o nome do arquivo de pontos.
     String filename = "";
     Serial.print("Filename: ");
@@ -161,49 +162,63 @@ void loop() {
     /**
      * Captura as distâncias em coordenadas esféricas e insere os
      * dados no arquivo.
-     *      0 <=r < inf
+     *      0 <=rho < 4000
      *      0 <= theta < 360 (2pi)
-     *      0 <= phi < 180 (pi)
+     *      0 <= phi <= 90 (pi/2) -> Iniciando no 90, em direção ao zero.
      */
 
-    /**
-     * O método distance dispara o sensor e realiza uma medição.
-     * 
-     * @param biasCorrection Correção de polarização do receptor.
-     *      false: Medição mais rápida, sem correção.
-     *      true: Medição com a correção de polarização. Deve ser realizada
-     *            periodicamente (1 em cada 100 medições). -> Default
-     */
-    int r;
+    int rho;
     float theta;
     float phi;
 
-    for (int j = 0; j < 100; j++) {
-        Serial.print("Rodada ");
-        Serial.println(j+1);
+    // Laço que determina o movimento do sensor no sentido de phi
+    for (int step = 0; step < STEP_LIMIT; step++) {
+        // Laço que determina o movimento do sensor no sentido de theta
+        // 3 repetições de 100 medidas. Aproximadamente pouco mais de uma volta.
+        for (int j = 0; j < 3; j++) {
+            //// Serial.print("Rodada ");
+            //// Serial.println(j+1);
 
-        r = lidar.distance();
-        theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1)); // Regra de 3
-        // TODO: Calcular valor de phi através da posição do motor de passo.
-        phi = 180;
+            /**
+             * O método distance dispara o sensor e realiza uma medição.
+             * 
+             * @param biasCorrection Correção de polarização do receptor.
+             *      false: Medição mais rápida, sem correção.
+             *      true: Medição com a correção de polarização. Deve ser realizada
+             *            periodicamente (1 em cada 100 medições). -> Default
+             */
+            rho = lidar.distance();
+            theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1)); // Regra de 3
+            // O valor valculado é subtraído de 90 para que o algulo inicie em
+            // 90 e chegue até 0.
+            phi = 90.0 - (float(step) * (90.0 / float(STEP_LIMIT - 1))); // Regra de 3
 
-        file.print(r);
-        file.print("\t");
-        file.print(theta);
-        file.print("\t");
-        file.println(phi);
-
-        for(byte i = 0; i < 99; i++) {
-            r = lidar.distance(false);
-            theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1));
-            
-            file.print(r);
+            file.print(rho);
             file.print("\t");
             file.print(theta);
             file.print("\t");
             file.println(phi);
+
+            for(byte i = 0; i < 99; i++) {
+                rho = lidar.distance(false);
+                theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1));
+                phi = 90.0 - (float(step) * (90.0 / float(STEP_LIMIT - 1)));
+
+                file.print(rho);
+                file.print("\t");
+                file.print(theta);
+                file.print("\t");
+                file.println(phi);
+            }
+            file.flush(); // Descarrega os dados do buffer no arquivo.
         }
-        file.flush(); // Descarrega os dados do buffer no arquivo.
+        Serial.print("Steps ");
+        Serial.print(step);
+        Serial.print("\tGraus ");
+        Serial.println(phi);
+        
+        // Aplica um passo ao motor a cada iteração para movimentar o sensor.
+        stepper.step(1);
     }
     
     file.close(); // Fecha o acesso ao arquivo
