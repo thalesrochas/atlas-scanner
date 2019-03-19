@@ -1,2 +1,7 @@
 .vscode
 Peças
+*.b#*
+*.s#*
+*.job
+*.rar
+*.blend1
