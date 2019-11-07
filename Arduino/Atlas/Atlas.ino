@@ -24,6 +24,7 @@ const int STEP_LIMIT = 355;
  * Valor aproximado obtido através de testes.
  * Necessita fazer uma compensação via código para alinhas os
  * pontos a cada volta.
+ * ? Feito! Ver interrupção.
  */
 const int TICKS_PER_TURN = 2245;
 
@@ -92,7 +93,7 @@ void setup() {
      */
     pinMode(ENCODER_PIN, INPUT); // Define como entrada
     attachInterrupt(digitalPinToInterrupt(ENCODER_PIN), interrupt, CHANGE);
-    //? detachInterrupt(digitalPinToInterrupt(ENCODER_PIN));
+    //// detachInterrupt(digitalPinToInterrupt(ENCODER_PIN));
 
     /**
      * O método begin inicializa e define a configuração do sensor.
@@ -123,8 +124,18 @@ void setup() {
     stepper.setSpeed(80); // Configura o motor para velocidade de 80rpm.
 }
 
+// Fator de correção de giro. 14.95 me pareceu o melhor depois de vários testes.
+float factor = 0.0;
+int acumulator = 0; // Usado para compensar o valor de theta.
+int turns = 0; // Usado para saber a volta atual.
+
 void loop() {
     Serial.println("Nova medição");
+
+    // Reinicia as variáveis
+    factor = 0.0;
+    acumulator = 0;
+    turns = 0;
 
     // Leva o suporte ao início até o endstop ser ativado.
     //? Há uma negação (!) na expressão devido a lógica invertida do botão.
@@ -134,6 +145,14 @@ void loop() {
     }
     //// delay(500);
     //// stepper.step(STEP_LIMIT); // Leva o sensor até a posição inicial de leitura.
+
+    //! Recebe pela porta serial o valor do fator de correção.
+    Serial.print("Fator de correção: ");
+    while (factor == 0.0) {
+        if (Serial.available()) {
+            factor = Serial.readString().toFloat();
+        }
+    }
 
     // Recebe pela porta serial o nome do arquivo de pontos.
     String filename = "";
@@ -172,10 +191,10 @@ void loop() {
     float phi;
 
     // Laço que determina o movimento do sensor no sentido de phi
-    for (int step = 0; step < STEP_LIMIT; step++) {
+    //! for (int step = 0; step < STEP_LIMIT; step++) {
         // Laço que determina o movimento do sensor no sentido de theta
         // 3 repetições de 100 medidas. Aproximadamente pouco mais de uma volta.
-        for (int j = 0; j < 3; j++) {
+        for (byte j = 0; j < 50; j++) {
             //// Serial.print("Rodada ");
             //// Serial.println(j+1);
 
@@ -188,10 +207,16 @@ void loop() {
              *            periodicamente (1 em cada 100 medições). -> Default
              */
             rho = lidar.distance();
-            theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1)); // Regra de 3
-            // O valor valculado é subtraído de 90 para que o algulo inicie em
+
+            // Regra de 3 - acumulador
+            theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1)) - acumulator;
+            // theta pode ficar negativo devido a subtração com o acumulador, dessa forma,
+            // remapeia-se o valor de theta para que seu valor sempre seja 0 <= theta < 360.
+            theta = theta < 0.0 ? theta + 360.0 : theta;
+            
+            // O valor calculado é subtraído de 90 para que o ângulo inicie em
             // 90 e chegue até 0.
-            phi = 90.0 - (float(step) * (90.0 / float(STEP_LIMIT - 1))); // Regra de 3
+            phi = 90.0; // - (float(step) * (90.0 / float(STEP_LIMIT - 1))); // Regra de 3
 
             file.print(rho);
             file.print("\t");
@@ -199,10 +224,12 @@ void loop() {
             file.print("\t");
             file.println(phi);
 
-            for(byte i = 0; i < 99; i++) {
+            for (byte i = 0; i < 99; i++) {
                 rho = lidar.distance(false);
-                theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1));
-                phi = 90.0 - (float(step) * (90.0 / float(STEP_LIMIT - 1)));
+                theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1)) - acumulator;
+                theta = theta < 0.0 ? theta + 360.0 : theta;
+                // theta = float(ticks) * (344.0 / float(TICKS_PER_TURN - 1));
+                phi = 90.0; // - (float(step) * (90.0 / float(STEP_LIMIT - 1)));
 
                 file.print(rho);
                 file.print("\t");
@@ -212,14 +239,14 @@ void loop() {
             }
             file.flush(); // Descarrega os dados do buffer no arquivo.
         }
-        Serial.print("Steps ");
-        Serial.print(step);
-        Serial.print("\tGraus ");
-        Serial.println(phi);
+        //// Serial.print("Steps ");
+        //// Serial.print(step);
+        //// Serial.print("\tGraus ");
+        //// Serial.println(phi);
         
         // Aplica um passo ao motor a cada iteração para movimentar o sensor.
-        stepper.step(1);
-    }
+        //! stepper.step(1);
+    //! }
     
     file.close(); // Fecha o acesso ao arquivo
     Serial.println("Fim da captura de pontos.\n");
@@ -231,4 +258,16 @@ void loop() {
 void interrupt() {
     ticks++;
     ticks %= TICKS_PER_TURN;
+    
+    // Se ticks == 0, então é uma nova volta.
+    turns = ticks == 0 ? turns + 1 : turns;
+
+    // Calcula um acumulador para remover o erro de deslocamento para cada volta.
+    // O Fator de correção é quem faz o ajuste do erro.
+    acumulator = factor * (ticks / TICKS_PER_TURN + turns);
+    
+    // Acumulador não ser maior que 360.
+    // Como o acumulador vai subtrair o angulo atual, é interessante que
+    // ele esteja dentro do limite 0 <= acumulador < 360.
+    acumulator = acumulator >= 360.0 ? acumulator - 360.0 : acumulator;
 }
