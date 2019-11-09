@@ -126,7 +126,7 @@ void setup() {
 
 // Fator de correção de giro. 14.95 me pareceu o melhor depois de vários testes.
 float factor = 0.0;
-int acumulator = 0; // Usado para compensar o valor de theta.
+float acumulator = 0.0; // Usado para compensar o valor de theta.
 int turns = 0; // Usado para saber a volta atual.
 
 void loop() {
@@ -134,7 +134,7 @@ void loop() {
 
     // Reinicia as variáveis
     factor = 0.0;
-    acumulator = 0;
+    acumulator = 0.0;
     turns = 0;
 
     // Leva o suporte ao início até o endstop ser ativado.
@@ -264,9 +264,9 @@ void interrupt() {
 
     // Calcula um acumulador para remover o erro de deslocamento para cada volta.
     // O Fator de correção é quem faz o ajuste do erro.
-    acumulator = factor * (ticks / TICKS_PER_TURN + turns);
+    acumulator = factor * (float(ticks) / float(TICKS_PER_TURN) + float(turns));
     
-    // Acumulador não ser maior que 360.
+    // Acumulador não deve ser maior que 360.
     // Como o acumulador vai subtrair o angulo atual, é interessante que
     // ele esteja dentro do limite 0 <= acumulador < 360.
     acumulator = acumulator >= 360.0 ? acumulator - 360.0 : acumulator;
