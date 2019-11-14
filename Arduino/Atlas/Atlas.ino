@@ -125,17 +125,19 @@ void setup() {
 }
 
 // Fator de correção de giro. 14.95 me pareceu o melhor depois de vários testes.
-float factor = 0.0;
+float factor = 14.95;
 float acumulator = 0.0; // Usado para compensar o valor de theta.
 int turns = 0; // Usado para saber a volta atual.
+int J = 0; // J = 1 já é suficiente para fazer uma boa medida.
 
 void loop() {
     Serial.println("Nova medição");
 
     // Reinicia as variáveis
-    factor = 0.0;
+    factor = 14.95;
     acumulator = 0.0;
     turns = 0;
+    J = 0;
 
     // Leva o suporte ao início até o endstop ser ativado.
     //? Há uma negação (!) na expressão devido a lógica invertida do botão.
@@ -147,10 +149,18 @@ void loop() {
     //// stepper.step(STEP_LIMIT); // Leva o sensor até a posição inicial de leitura.
 
     //! Recebe pela porta serial o valor do fator de correção.
-    Serial.print("Fator de correção: ");
-    while (factor == 0.0) {
+    // Serial.print("Fator de correção: ");
+    // while (factor == 0.0) {
+    //     if (Serial.available()) {
+    //         factor = Serial.readString().toFloat();
+    //     }
+    // }
+
+    //! Recebe pela porta serial o valor de J.
+    Serial.print("J: ");
+    while (J == 0.0) {
         if (Serial.available()) {
-            factor = Serial.readString().toFloat();
+            J = Serial.readString().toInt();
         }
     }
 
@@ -191,10 +201,10 @@ void loop() {
     float phi;
 
     // Laço que determina o movimento do sensor no sentido de phi
-    //! for (int step = 0; step < STEP_LIMIT; step++) {
+    for (int step = 0; step < STEP_LIMIT; step++) {
         // Laço que determina o movimento do sensor no sentido de theta
         // 3 repetições de 100 medidas. Aproximadamente pouco mais de uma volta.
-        for (byte j = 0; j < 50; j++) {
+        for (byte j = 0; j < J; j++) {
             //// Serial.print("Rodada ");
             //// Serial.println(j+1);
 
@@ -216,7 +226,7 @@ void loop() {
             
             // O valor calculado é subtraído de 90 para que o ângulo inicie em
             // 90 e chegue até 0.
-            phi = 90.0; // - (float(step) * (90.0 / float(STEP_LIMIT - 1))); // Regra de 3
+            phi = 90.0 - (float(step) * (90.0 / float(STEP_LIMIT - 1))); // Regra de 3
 
             file.print(rho);
             file.print("\t");
@@ -229,7 +239,7 @@ void loop() {
                 theta = float(ticks) * (360.0 / float(TICKS_PER_TURN - 1)) - acumulator;
                 theta = theta < 0.0 ? theta + 360.0 : theta;
                 // theta = float(ticks) * (344.0 / float(TICKS_PER_TURN - 1));
-                phi = 90.0; // - (float(step) * (90.0 / float(STEP_LIMIT - 1)));
+                phi = 90.0 - (float(step) * (90.0 / float(STEP_LIMIT - 1)));
 
                 file.print(rho);
                 file.print("\t");
@@ -245,8 +255,8 @@ void loop() {
         //// Serial.println(phi);
         
         // Aplica um passo ao motor a cada iteração para movimentar o sensor.
-        //! stepper.step(1);
-    //! }
+        stepper.step(1);
+    }
     
     file.close(); // Fecha o acesso ao arquivo
     Serial.println("Fim da captura de pontos.\n");
