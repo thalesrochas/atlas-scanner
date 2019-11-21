@@ -22,7 +22,7 @@ const int STEP_LIMIT = 355;
 /**
  * Define a quantidade de ticks do encoder por volta.
  * Valor aproximado obtido através de testes.
- * Necessita fazer uma compensação via código para alinhas os
+ * Necessita fazer uma compensação via código para alinhar os
  * pontos a cada volta.
  * ? Feito! Ver interrupção.
  */
@@ -93,7 +93,6 @@ void setup() {
      */
     pinMode(ENCODER_PIN, INPUT); // Define como entrada
     attachInterrupt(digitalPinToInterrupt(ENCODER_PIN), interrupt, CHANGE);
-    //// detachInterrupt(digitalPinToInterrupt(ENCODER_PIN));
 
     /**
      * O método begin inicializa e define a configuração do sensor.
@@ -124,20 +123,20 @@ void setup() {
     stepper.setSpeed(80); // Configura o motor para velocidade de 80rpm.
 }
 
-// Fator de correção de giro. 14.95 me pareceu o melhor depois de vários testes.
+// Fator de correção de giro. 14.95 me pareceu aproximado o suficiente depois de vários testes.
 float factor = 14.95;
 float acumulator = 0.0; // Usado para compensar o valor de theta.
 int turns = 0; // Usado para saber a volta atual.
-int J = 0; // J = 1 já é suficiente para fazer uma boa medida.
+int J = 1; // J = 1 já é suficiente para fazer uma boa medida.
 
 void loop() {
     Serial.println("Nova medição");
 
     // Reinicia as variáveis
-    factor = 14.95;
+    //// factor = 0;
     acumulator = 0.0;
     turns = 0;
-    J = 0;
+    //// J = 0;
 
     // Leva o suporte ao início até o endstop ser ativado.
     //? Há uma negação (!) na expressão devido a lógica invertida do botão.
@@ -145,8 +144,6 @@ void loop() {
         // O sinal negativo representa a direção contrária do giro.
         stepper.step(-1);
     }
-    //// delay(500);
-    //// stepper.step(STEP_LIMIT); // Leva o sensor até a posição inicial de leitura.
 
     //! Recebe pela porta serial o valor do fator de correção.
     // Serial.print("Fator de correção: ");
@@ -157,12 +154,12 @@ void loop() {
     // }
 
     //! Recebe pela porta serial o valor de J.
-    Serial.print("J: ");
-    while (J == 0.0) {
-        if (Serial.available()) {
-            J = Serial.readString().toInt();
-        }
-    }
+    // Serial.print("J: ");
+    // while (J == 0.0) {
+    //     if (Serial.available()) {
+    //         J = Serial.readString().toInt();
+    //     }
+    // }
 
     // Recebe pela porta serial o nome do arquivo de pontos.
     String filename = "";
@@ -205,9 +202,6 @@ void loop() {
         // Laço que determina o movimento do sensor no sentido de theta
         // 3 repetições de 100 medidas. Aproximadamente pouco mais de uma volta.
         for (byte j = 0; j < J; j++) {
-            //// Serial.print("Rodada ");
-            //// Serial.println(j+1);
-
             /**
              * O método distance dispara o sensor e realiza uma medição.
              * 
@@ -249,10 +243,6 @@ void loop() {
             }
             file.flush(); // Descarrega os dados do buffer no arquivo.
         }
-        //// Serial.print("Steps ");
-        //// Serial.print(step);
-        //// Serial.print("\tGraus ");
-        //// Serial.println(phi);
         
         // Aplica um passo ao motor a cada iteração para movimentar o sensor.
         stepper.step(1);
